@@ -18,6 +18,6 @@ cron.schedule('0 0 * * *', async () => {
   await prices.updatePrices();
 });
 
-app.listen(4000, () => {
+app.listen(3000, () => {
   console.log('listening on port 4000');
 });
