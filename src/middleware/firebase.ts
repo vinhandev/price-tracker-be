@@ -1,6 +1,6 @@
 const firebase = require('./firebase');
 
-function authMiddleware(request, response, next) {
+export function firebaseAuth(request, response, next) {
   const headerToken = request.headers.authorization;
   if (!headerToken) {
     return response.send({ message: 'No token provided' }).status(401);
@@ -17,5 +17,3 @@ function authMiddleware(request, response, next) {
     .then(() => next())
     .catch(() => response.send({ message: 'Could not authorize' }).status(403));
 }
-
-module.exports = authMiddleware;

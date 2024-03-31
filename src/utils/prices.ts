@@ -1,7 +1,4 @@
-const firebase = require('firebase-admin');
-
-const db = firebase.firestore();
-const priceRef = db.collection('Prices');
+import { priceRef } from '../services';
 
 const isSameDay = (date1, date2) => {
   const isSameDayTime = date1.getDate() === date2.getDate();
@@ -10,7 +7,7 @@ const isSameDay = (date1, date2) => {
   return isSameDayTime && isSameMonth && isSameYear;
 };
 
-function convertStringToNumber(str) {
+export function convertStringToNumber(str) {
   const numericStr = str.replace(/[^0-9]/g, '');
 
   const number = parseFloat(numericStr);
@@ -18,10 +15,34 @@ function convertStringToNumber(str) {
   return isNaN(number) ? null : number;
 }
 
-const updateFirebasePrices = async (uid, props) => {
+export async function jobUpdatePrices() {
+  try {
+    const snapShots = await priceRef.listDocuments();
+
+    // Use map to create an array of promises
+    const promises = snapShots.map(async (snaps) => {
+      console.log('snaps', snaps);
+
+      const responseGet = await snaps.get();
+      const responseData = await responseGet.data();
+      await handleFetch(responseData.prices, responseData.labels, snaps.id);
+
+      console.log('success');
+    });
+
+    // Wait for all promises to resolve
+    await Promise.all(promises);
+
+    // Once all promises are resolved, send the success response
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+export const updateFirebasePrices = async (uid, props) => {
   await priceRef.doc(uid).set(props);
 };
-async function handleFetch(paramPrices, paramLabels, uid) {
+export async function handleFetch(paramPrices, paramLabels, uid) {
   const lastUpdate = new Date().getTime();
   let isHaveRecord = false;
 
@@ -102,8 +123,3 @@ async function handleFetch(paramPrices, paramLabels, uid) {
     return error.message;
   }
 }
-
-module.exports = {
-  handleFetch,
-  convertStringToNumber
-};

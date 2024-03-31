@@ -1,9 +1,9 @@
-const firebase = require('firebase-admin');
+import firebase from 'firebase-admin';
 
-const db = firebase.firestore();
-const priceRef = db.collection('Prices');
-const utils = require('../utils/prices.js');
-async function updatePrices(request, response) {
+import { priceRef } from '../services';
+import { convertStringToNumber, handleFetch } from '../utils';
+
+export async function updatePrices(request, response) {
   try {
     const snapShots = await priceRef.listDocuments();
 
@@ -13,11 +13,7 @@ async function updatePrices(request, response) {
 
       const responseGet = await snaps.get();
       const responseData = await responseGet.data();
-      await utils.handleFetch(
-        responseData.prices,
-        responseData.labels,
-        snaps.id
-      );
+      await handleFetch(responseData.prices, responseData.labels, snaps.id);
 
       console.log('success');
     });
@@ -32,21 +28,21 @@ async function updatePrices(request, response) {
   }
 }
 
-async function updateUserPrices(request, response) {
+export async function updateAUserPrices(request, response) {
   try {
     const token = request.headers.authorization.split(' ')[1];
     const auth = await firebase.auth().verifyIdToken(token);
 
     const snapShots = await priceRef.doc(auth.uid).get();
     const responseData = await snapShots.data();
-    await utils.handleFetch(responseData.prices, responseData.labels, auth.uid);
-    return response.status(200).send('success');
+    await handleFetch(responseData.prices, responseData.labels, auth.uid);
+    return response.status(200);
   } catch (error) {
     return response.status(500).send(error.message);
   }
 }
 
-async function getPrices(request, response) {
+export async function getPrices(request, response) {
   console.log('get prices', firebase);
   const token = request.headers.authorization.split(' ')[1];
   const auth = await firebase.auth().verifyIdToken(token);
@@ -54,7 +50,7 @@ async function getPrices(request, response) {
 
   const ref = await priceRef.doc(auth.uid).get();
 
-  if (ref.empty) {
+  if (!ref.exists) {
     console.log('No matching documents.');
     return;
   }
@@ -63,7 +59,7 @@ async function getPrices(request, response) {
   return response.status(200).send(prices);
 }
 
-async function previewPrices(request, response) {
+export async function previewPrices(request, response) {
   const { websiteLink, beforeCharacters, afterCharacters } = request.query;
 
   try {
@@ -83,7 +79,7 @@ async function previewPrices(request, response) {
       data?.split(beforeCharacters.split(' ').join(''))[1] ?? '0';
     const price1 =
       tmpPrice?.split(afterCharacters.split(' ').join(''))[0] ?? '0';
-    const number = utils.convertStringToNumber(price1) ?? 0;
+    const number = convertStringToNumber(price1) ?? 0;
 
     return response.status(200).send({
       websiteRemoveBeforeCharacters: tmpRemoved,
@@ -95,10 +91,3 @@ async function previewPrices(request, response) {
     return response.status(500).send(error.message);
   }
 }
-
-module.exports = {
-  getPrices,
-  updatePrices,
-  updateUserPrices,
-  previewPrices,
-};
