@@ -1,4 +1,4 @@
-const firebase = require('./firebase');
+import firebase from 'firebase-admin';
 
 export function firebaseAuth(request, response, next) {
   const headerToken = request.headers.authorization;
