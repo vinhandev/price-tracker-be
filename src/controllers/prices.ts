@@ -1,7 +1,13 @@
 import firebase from 'firebase-admin';
 
 import { priceRef } from '../services';
-import { convertStringToNumber, handleFetch } from '../utils';
+import {
+  convertStringToNumber,
+  handleFetch,
+  handlePreviewPrices,
+} from '../utils';
+import axios from 'axios';
+import { CheerioAPI, load } from 'cheerio';
 
 export async function updatePrices(request, response) {
   try {
@@ -22,7 +28,7 @@ export async function updatePrices(request, response) {
     await Promise.all(promises);
 
     // Once all promises are resolved, send the success response
-    return response.status(200).send('success');
+    return response.status(200).send({ message: 'success' });
   } catch (error) {
     return response.status(500).send(error.message);
   }
@@ -36,7 +42,7 @@ export async function updateAUserPrices(request, response) {
     const snapShots = await priceRef.doc(auth.uid).get();
     const responseData = await snapShots.data();
     await handleFetch(responseData.prices, responseData.labels, auth.uid);
-    return response.status(200);
+    return response.sendStatus(200).send({ message: 'success' });
   } catch (error) {
     return response.status(500).send(error.message);
   }
@@ -60,32 +66,19 @@ export async function getPrices(request, response) {
 }
 
 export async function previewPrices(request, response) {
-  const { websiteLink, beforeCharacters, afterCharacters } = request.query;
+  const { websiteLink, selector } = request.query;
 
   try {
-    const responseLinkData = await fetch(websiteLink);
-    const data = (await responseLinkData.text())
-      .replace(/\n/g, ' ')
-      .replace(/\r/g, ' ')
-      .replace(/\t/g, ' ')
-      .split('=""')
-      .join('')
-      .split(' ')
-      .join('');
-
-    const tmpRemoved =
-      data?.split(beforeCharacters.split(' ').join(''))[0] ?? '0';
-    const tmpPrice =
-      data?.split(beforeCharacters.split(' ').join(''))[1] ?? '0';
-    const price1 =
-      tmpPrice?.split(afterCharacters.split(' ').join(''))[0] ?? '0';
-    const number = convertStringToNumber(price1) ?? 0;
+    const { price, rawPrice, logo } = await handlePreviewPrices(
+      websiteLink,
+      selector,
+      true
+    );
 
     return response.status(200).send({
-      websiteRemoveBeforeCharacters: tmpRemoved,
-      websiteSourceCode: tmpPrice,
-      websiteRemoveAllCharacters: price1,
-      price: number,
+      logo,
+      rawPrice,
+      price,
     });
   } catch (error) {
     return response.status(500).send(error.message);

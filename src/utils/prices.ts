@@ -1,4 +1,7 @@
+import { CheerioAPI, load } from 'cheerio';
 import { priceRef } from '../services';
+import axios from 'axios';
+import puppeteer from 'puppeteer';
 
 const isSameDay = (date1, date2) => {
   const isSameDayTime = date1.getDate() === date2.getDate();
@@ -42,6 +45,64 @@ export async function jobUpdatePrices() {
 export const updateFirebasePrices = async (uid, props) => {
   await priceRef.doc(uid).set(props);
 };
+
+export async function handlePreviewPrices(
+  websiteLink: string,
+  selector: string,
+  isUpdateImage: boolean = false
+) {
+  try {
+    const responseLinkData = await axios.get(websiteLink);
+
+    const $ = load(responseLinkData.data);
+    let rawPrice = $(selector, '').text();
+
+    console.log('rawPrice', rawPrice.split('\n')[0]);
+
+    const price = convertStringToNumber(rawPrice || '') ?? 0;
+
+    if (isUpdateImage) {
+      const logo = getFavicon(websiteLink, $);
+      return {
+        logo,
+        rawPrice,
+        price,
+      };
+    }
+
+    return {
+      rawPrice,
+      price,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function getFavicon(url: string, $: CheerioAPI) {
+  try {
+    // Find the favicon link in the <head> section
+    const faviconLink =
+      $('head').find('link[rel="icon"]').attr('href') ||
+      $('head').find('link[rel="shortcut icon"]').attr('href');
+
+    // If no favicon link is found, return null
+    if (!faviconLink) {
+      return 'https://s2.googleusercontent.com/s2/favicons?domain_url=' + url;
+    }
+
+    // If the favicon link is a relative path, prepend the domain
+    if (!faviconLink.startsWith('http')) {
+      const domain = new URL(url).origin;
+      return domain + faviconLink;
+    }
+
+    return faviconLink;
+  } catch (error) {
+    console.error('Error fetching favicon:', error);
+    return null;
+  }
+}
 export async function handleFetch(paramPrices, paramLabels, uid) {
   const lastUpdate = new Date().getTime();
   let isHaveRecord = false;
@@ -56,26 +117,16 @@ export async function handleFetch(paramPrices, paramLabels, uid) {
         const element = paramPrices[index].data[i];
         try {
           console.log(element.link);
-          const response = await fetch(element.link);
-          const data = (await response.text())
-            .replace(/\n/g, ' ')
-            .replace(/\r/g, ' ')
-            .replace(/\t/g, ' ')
-            .split('=""')
-            .join('')
-            .split(' ')
-            .join('');
-
-          const price =
-            data
-              .split(element.first.split(' ').join(''))[1]
-              ?.split(element.last.split(' ').join(''))[0] ?? '0';
-          const number = convertStringToNumber(price);
-          if (number !== null && number !== 0) {
+          const { price } = await handlePreviewPrices(
+            element.link,
+            element.selector,
+            false
+          );
+          if (price !== null && price !== 0) {
             if (!element?.data) {
               element.data = [
                 {
-                  price: number,
+                  price,
                   date: lastUpdate,
                 },
               ];
@@ -85,7 +136,7 @@ export async function handleFetch(paramPrices, paramLabels, uid) {
               }
 
               element.data?.push({
-                price: number,
+                price,
                 date: lastUpdate,
               });
             }
